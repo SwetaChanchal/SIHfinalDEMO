@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aapda Sathi: Command Center</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.7.77/Tone.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        :root { --orange: #ff8f00; --teal: #00796b; --midnight: #0c1427; --slate: #102a43; }
+        html { scroll-behavior: smooth; }
+        body { 
+            font-family: 'Poppins', sans-serif; 
+            background-color: var(--midnight);
+            background: linear-gradient(170deg, var(--midnight) 0%, var(--slate) 100%);
+            color: #f0f4f8;
+            overflow: hidden; /* Prevent scrolling on main body */
+        }
+        .glass-header { background-color: rgba(12, 20, 39, 0.7); backdrop-filter: blur(12px); border-bottom: 1px solid rgba(255, 255, 255, 0.1); }
+        .card { 
+            background-color: rgba(16, 42, 67, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s, box-shadow 0.3s, background-color 0.3s;
+            backdrop-filter: blur(5px);
+            will-change: transform;
+        }
+        .card:hover { 
+            transform: translateY(-8px); 
+            box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2);
+            background-color: rgba(16, 42, 67, 0.9);
+        }
+        .gemini-response { white-space: pre-wrap; background-color: #0c1427; border-radius: 0.5rem; padding: 1.5rem; margin-top: 1.5rem; min-height: 100px; line-height: 1.7; color: #e2e8f0; border: 1px solid rgba(255, 255, 255, 0.2); }
+        .loader { border: 4px solid #4a5568; border-top: 4px solid var(--orange); border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        /* Main App Layout */
+        .app-container { height: calc(100vh - 70px); display: flex; flex-direction: column; }
+        .app-nav { flex-shrink: 0; }
+        .app-view-container { flex-grow: 1; overflow-y: auto; padding: 2rem; }
+        .app-view { display: none; }
+        .app-view.active { display: block; animation: fade-in 0.5s ease-out; }
+        @keyframes fade-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .tab-button {
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            font-weight: 600;
+            transition: background-color 0.3s, color 0.3s;
+            border: 2px solid transparent;
+        }
+        .tab-button.active {
+            background-color: var(--orange);
+            color: white;
+            border-color: var(--orange);
+        }
+        .tab-button:not(.active) {
+             border-color: var(--slate);
+             background-color: rgba(16, 42, 67, 0.6);
+        }
+
+        /* Virtual Drill Experience */
+        #drill-experience-container {
+            background-image: url('https://placehold.co/1200x800/000000/FFFFFF?text=Classroom+View');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            overflow: hidden;
+            border-radius: 1rem;
+            min-height: 600px;
+        }
+        .drill-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: rgba(0,0,0,0.6);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 2rem;
+            text-align: center;
+            backdrop-filter: blur(2px);
+        }
+        @keyframes screen-shake {
+            0%, 100% { transform: translate(0, 0) rotate(0); }
+            10% { transform: translate(-5px, -2px) rotate(-0.5deg); }
+            20% { transform: translate(2px, 5px) rotate(0.5deg); }
+            30% { transform: translate(-8px, 2px) rotate(-1deg); }
+            40% { transform: translate(5px, -5px) rotate(1deg); }
+            50% { transform: translate(-5px, 5px) rotate(-0.5deg); }
+            60% { transform: translate(2px, -8px) rotate(0.5deg); }
+            70% { transform: translate(-8px, 2px) rotate(-1deg); }
+            80% { transform: translate(5px, -5px) rotate(1deg); }
+            90% { transform: translate(-2px, 5px) rotate(-0.5deg); }
+        }
+        .is-shaking { animation: screen-shake 0.5s linear infinite; }
+        .drill-choice-btn {
+            background-color: rgba(16, 42, 67, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        /* Modal Styles */
+        .modal { display: none; position: fixed; z-index: 100; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); backdrop-filter: blur(5px); }
+        .modal-content { background-color: var(--slate); margin: 5% auto; padding: 2rem; border: 1px solid rgba(255, 255, 255, 0.2); width: 90%; max-width: 600px; border-radius: 1rem; position: relative; animation: slide-down 0.5s ease-out; }
+        @keyframes slide-down { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .close-button { color: #aaa; position: absolute; top: 1rem; right: 1.5rem; font-size: 28px; font-weight: bold; cursor: pointer; }
+        #chat-history { height: 300px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 0.5rem; padding: 1rem; }
+        .chat-message { margin-bottom: 1rem; }
+        .chat-message.user { text-align: right; }
+        .chat-bubble { display: inline-block; padding: 0.5rem 1rem; border-radius: 1rem; max-width: 80%; }
+        .chat-bubble.user { background-color: var(--orange); color: white; }
+        .chat-bubble.bot { background-color: #2c5282; color: white; }
+        #heatmap-canvas { background-color: #334155; border-radius: 0.5rem; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <header class="glass-header sticky top-0 z-50">
+        <div class="container mx-auto px-6 py-3 flex justify-between items-center">
+            <h1 class="text-3xl font-extrabold text-slate-100">Aapda<span class="text-orange-400"> Sathi</span></h1>
+        </div>
+    </header>
+
+    <div class="app-container">
+        <nav class="app-nav bg-transparent p-4 border-b border-slate-700">
+            <div class="container mx-auto flex justify-center items-center gap-4">
+                <button class="tab-button active" data-view="dashboard">Mission HQ</button>
+                <button class="tab-button" data-view="missions">Learning Missions</button>
+                <button class="tab-button" data-view="drill">Virtual Drill</button>
+                <button class="tab-button" data-view="charts">Impact Stats</button>
+            </div>
+        </nav>
+
+        <div class="app-view-container">
+            <!-- Dashboard View -->
+            <div id="dashboard-view" class="app-view active">
+                <div class="text-center mb-12">
+                    <h2 class="text-4xl font-bold text-white">Mission HQ: Your Command Center</h2>
+                    <p class="text-slate-300 max-w-2xl mx-auto mt-2">All the tools you need to prepare, practice, and connect during an emergency. Select a module to begin.</p>
+                </div>
+                <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
+                     <div id="openChatbotBtn" class="card p-6 rounded-2xl text-center cursor-pointer"><h4 class="text-xl font-bold mb-2 text-orange-400">🤖 AI Chatbot</h4><p class="text-sm text-slate-300">Instant disaster guidance in 12+ regional languages.</p></div>
+                    <div id="openHeatmapBtn" class="card p-6 rounded-2xl text-center cursor-pointer"><h4 class="text-xl font-bold mb-2 text-orange-400">🗺️ Crowd Heatmap</h4><p class="text-sm text-slate-300">Real-time evacuation route optimization (Simulation).</p></div>
+                    <div id="openFirstAidBtn" class="card p-6 rounded-2xl text-center cursor-pointer"><h4 class="text-xl font-bold mb-2 text-orange-400">✨ AI First-Aid Assistant</h4><p class="text-sm text-slate-300">Get immediate guidance for common injuries.</p></div>
+                    <div id="openRumorCheckerBtn" class="card p-6 rounded-2xl text-center cursor-pointer"><h4 class="text-xl font-bold mb-2 text-orange-400">✨ Rumor Checker</h4><p class="text-sm text-slate-300">Verify information and fight misinformation.</p></div>
+                </div>
+            </div>
+
+            <!-- Learning Missions View -->
+            <div id="missions-view" class="app-view">
+                 <div class="text-center mb-12">
+                    <h2 class="text-4xl font-bold mb-3 text-white">Your First Mission: Flood Ready</h2>
+                    <p class="text-slate-300 max-w-3xl mx-auto text-lg">A flood warning has been issued for Dehradun. Help Rohan prepare his family's emergency kit. Complete all steps to earn your badge!</p>
+                </div>
+                <div class="max-w-4xl mx-auto mb-8"><div class="w-full mission-progress-bar-bg rounded-full h-4"><div id="mission-progress-bar" class="bg-orange-500 h-4 rounded-full mission-progress-bar" style="width: 0%"></div></div></div>
+                <div class="grid lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
+                    <div class="lg:col-span-2 card p-8 rounded-2xl shadow-2xl">
+                        <h4 class="text-2xl font-bold mb-1 text-white">Step 1: Pack the Emergency Kit</h4><p class="text-slate-300 mb-6">Drag the essential items into the kit. You need 5 correct items.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div id="items-source" class="space-y-4">
+                                <div class="draggable-item" draggable="true" data-item="correct">First-Aid Kit</div><div class="draggable-item" draggable="true" data-item="incorrect">Video Game</div><div class="draggable-item" draggable="true" data-item="correct">Water Bottles</div><div class="draggable-item" draggable="true" data-item="correct">Important Documents</div><div class="draggable-item" draggable="true" data-item="incorrect">Heavy Books</div><div class="draggable-item" draggable="true" data-item="correct">Torch & Batteries</div><div class="draggable-item" draggable="true" data-item="correct">Dry Food Items</div>
+                            </div>
+                            <div id="emergency-kit-dropzone" class="min-h-[200px] rounded-lg p-4 space-y-2"><p class="text-center text-slate-400 font-semibold">DROP ITEMS HERE</p></div>
+                        </div>
+                    </div>
+                    <div class="space-y-8">
+                        <div class="mission-step h-48" id="mission-step-2"><div class="mission-step-inner"><div class="mission-step-front"><h4 class="text-xl font-bold">Step 2: Secure Home</h4></div><div class="mission-step-back">✔️<h4 class="text-xl font-bold">Step Complete!</h4></div></div></div>
+                        <div class="mission-step h-48" id="mission-step-3"><div class="mission-step-inner"><div class="mission-step-front"><h4 class="text-xl font-bold">Step 3: Evacuation Route</h4></div><div class="mission-step-back">✔️<h4 class="text-xl font-bold">Step Complete!</h4></div></div></div>
+                    </div>
+                </div>
+                <div id="mission-complete-msg" class="hidden text-center mt-12 bg-green-900 border-2 border-green-500 text-white p-8 rounded-2xl max-w-3xl mx-auto"><h3 class="text-3xl font-bold mb-2">Mission Complete! Flood Ready Badge Unlocked!</h3><p>Great job! You are now better prepared!</p></div>
+            </div>
+
+            <!-- Virtual Drill View -->
+            <div id="drill-view" class="app-view">
+                <div id="drill-experience-container">
+                    <div id="drill-overlay-content" class="drill-overlay">
+                        <!-- Drill content injected here -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Charts View -->
+            <div id="charts-view" class="app-view">
+                <div class="grid lg:grid-cols-2 gap-12">
+                     <div class="card p-8 rounded-2xl shadow-2xl">
+                         <h3 class="text-2xl font-bold text-white mb-4">Preparedness Gap</h3>
+                         <canvas id="preparednessChart"></canvas>
+                     </div>
+                     <div class="card p-8 rounded-2xl shadow-2xl">
+                         <h3 class="text-2xl font-bold text-white mb-4">Impact Dashboard</h3>
+                         <div class="mb-4 text-center">
+                            <button id="beforeBtn" class="bg-teal-600 text-white px-6 py-2 rounded-md font-semibold">Before Aapda Sathi</button>
+                            <button id="afterBtn" class="bg-slate-700 text-slate-300 px-6 py-2 rounded-md font-semibold">After Aapda Sathi</button>
+                         </div>
+                         <canvas id="impactChart"></canvas>
+                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="chatbotModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h3 class="text-2xl font-bold text-white mb-4">AI Safety Chatbot</h3><div id="chat-history"></div><div class="mt-4 flex gap-2"><select id="languageSelect" class="p-2 bg-slate-700 text-white border border-slate-600 rounded-md"><option value="English">English</option><option value="Hindi">Hindi</option><option value="Bengali">Bengali</option><option value="Tamil">Tamil</option><option value="Telugu">Telugu</option><option value="Marathi">Marathi</option><option value="Gujarati">Gujarati</option><option value="Kannada">Kannada</option><option value="Malayalam">Malayalam</option><option value="Punjabi">Punjabi</option><option value="Odia">Odia</option><option value="Assamese">Assamese</option></select><input type="text" id="chatInput" class="flex-grow p-2 bg-slate-700 text-white border border-slate-600 rounded-md" placeholder="Ask a question..."><button id="chatSendBtn" class="bg-orange-500 text-white font-bold px-4 rounded-md">Send</button></div><div id="chatLoader" class="loader hidden"></div></div></div>
+    <div id="heatmapModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h3 class="text-2xl font-bold text-white mb-4">Live Evacuation Map (Simulation)</h3><p class="text-slate-300 mb-4">This simulation shows how real-time user data can optimize evacuation routes, guiding people away from danger zones to safe assembly points.</p><canvas id="heatmap-canvas" width="550" height="350"></canvas></div></div>
+    <div id="firstAidModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h3 class="text-2xl font-bold text-white mb-2">✨ AI First-Aid Assistant</h3><p class="text-xs text-yellow-400 mb-4 font-semibold">DISCLAIMER: For informational purposes only. Always call for professional medical help in an emergency.</p><textarea id="injuryDescription" placeholder="Describe the injury... (e.g., twisted ankle, swelling and pain)" class="w-full p-3 bg-slate-700 text-white border border-slate-600 rounded-md" rows="4"></textarea><button id="firstAidBtn" class="mt-4 w-full bg-orange-500 text-white font-bold py-3 px-4 rounded-md hover:bg-orange-600 transition">Get First-Aid Steps</button><div id="firstAidLoader" class="loader hidden"></div><div id="firstAidResult" class="gemini-response hidden"></div></div></div>
+    <div id="rumorCheckerModal" class="modal"><div class="modal-content"><span class="close-button">&times;</span><h3 class="text-2xl font-bold text-white mb-4">✨ Post-Disaster Rumor Checker</h3><p class="text-slate-300 mb-4">Heard a rumor? Paste it here. Our AI will check official sources to help you find the truth.</p><textarea id="rumorText" placeholder="Paste the rumor here... (e.g., I heard a dam has broken upstream)" class="w-full p-3 bg-slate-700 text-white border border-slate-600 rounded-md" rows="4"></textarea><button id="rumorBtn" class="mt-4 w-full bg-teal-600 text-white font-bold py-3 px-4 rounded-md hover:bg-teal-700 transition">Verify Information</button><div id="rumorLoader" class="loader hidden"></div><div id="rumorResult" class="gemini-response hidden"></div></div></div>
+
+
+    <script defer>
+        document.addEventListener('DOMContentLoaded', async () => {
+            // --- App View Manager ---
+            const tabButtons = document.querySelectorAll('.tab-button');
+            const appViews = document.querySelectorAll('.app-view');
+            tabButtons.forEach(button => {
+                button.addEventListener('click', () => {
+                    tabButtons.forEach(btn => btn.classList.remove('active'));
+                    button.classList.add('active');
+                    const targetView = document.getElementById(`${button.dataset.view}-view`);
+                    appViews.forEach(view => view.classList.remove('active'));
+                    targetView.classList.add('active');
+                    if (button.dataset.view === 'charts') initCharts();
+                });
+            });
+
+            // --- Chart Initialization (lazy loaded) ---
+            let chartsInitialized = false;
+            function initCharts() {
+                if (chartsInitialized) return;
+                Chart.defaults.color = '#e2e8f0';
+                Chart.defaults.borderColor = 'rgba(255, 255, 255, 0.2)';
+                const preparednessCtx = document.getElementById('preparednessChart').getContext('2d');
+                new Chart(preparednessCtx, { type: 'bar', data: { labels: ['Current Preparedness', 'With Aapda Sathi'], datasets: [{ label: 'Preparedness Score (%)', data: [25, 85], backgroundColor: ['#475569', '#009688'], borderRadius: 8, }] }, options: { responsive: true, maintainAspectRatio: true, scales: { y: { beginAtZero: true, max: 100, grid: { display: false } }, x: { grid: { display: false } } }, plugins: { legend: { display: false } } } });
+                const impactData = { before: { data: [30, 45, 40], colors: ['#475569', '#64748b', '#94a3b8'] }, after: { data: [90, 95, 88], colors: ['#00796b', '#009688', '#4db6ac'] } };
+                const impactCtx = document.getElementById('impactChart').getContext('2d');
+                let impactChart = new Chart(impactCtx, { type: 'doughnut', data: { labels: ['Drill Participation', 'Module Completion', 'Awareness Score'], datasets: [{ data: impactData.before.data, backgroundColor: impactData.before.colors, hoverOffset: 8, borderColor: '#102a43' }] }, options: { responsive: true, maintainAspectRatio: true, plugins: { legend: { position: 'bottom' }, title: { display: true, text: 'Key Performance Indicators (Before)', font: { size: 16 } } } } });
+                const beforeBtn = document.getElementById('beforeBtn'); const afterBtn = document.getElementById('afterBtn');
+                function updateImpactChart(data, colors, label, activeBtn, inactiveBtn) { impactChart.data.datasets[0].data = data; impactChart.options.plugins.title.text = `Key Performance Indicators (${label})`; impactChart.data.datasets[0].backgroundColor = colors; impactChart.update(); activeBtn.classList.add('bg-teal-600', 'text-white'); activeBtn.classList.remove('bg-slate-700', 'text-slate-300'); inactiveBtn.classList.add('bg-slate-700', 'text-slate-300'); inactiveBtn.classList.remove('bg-teal-600', 'text-white'); }
+                beforeBtn.addEventListener('click', () => updateImpactChart(impactData.before.data, impactData.before.colors, 'Before', beforeBtn, afterBtn));
+                afterBtn.addEventListener('click', () => updateImpactChart(impactData.after.data, impactData.after.colors, 'After', afterBtn, beforeBtn));
+                chartsInitialized = true;
+            }
+            
+             // --- Gemini API Call ---
+            const apiKey = ""; const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+            async function callGeminiAPI(payload, loaderEl, resultEl) { 
+                loaderEl.classList.remove('hidden'); 
+                if(resultEl) resultEl.classList.add('hidden');
+                try { 
+                    const response = await fetch(apiUrl, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }); 
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`); 
+                    const result = await response.json(); 
+                    const candidate = result.candidates?.[0]; 
+                    if (candidate && candidate.content?.parts?.[0]?.text) {
+                        return candidate.content.parts[0].text;
+                    } else { throw new Error("Invalid API response."); }
+                } catch (error) { 
+                    console.error("API call failed:", error); 
+                    return "Sorry, our AI partner is currently unavailable. Please try again soon.";
+                } finally {
+                    loaderEl.classList.add('hidden');
+                    if(resultEl) resultEl.classList.remove('hidden');
+                }
+            }
+             // --- Modals ---
+            const modals = { 
+                chatbot: document.getElementById('chatbotModal'), 
+                heatmap: document.getElementById('heatmapModal'),
+                firstAid: document.getElementById('firstAidModal'),
+                rumorChecker: document.getElementById('rumorCheckerModal'),
+            };
+            const openBtns = { 
+                chatbot: document.getElementById('openChatbotBtn'), 
+                heatmap: document.getElementById('openHeatmapBtn'),
+                firstAid: document.getElementById('openFirstAidBtn'),
+                rumorChecker: document.getElementById('openRumorCheckerBtn'),
+            };
+            Object.keys(modals).forEach(key => {
+                const modal = modals[key];
+                if (!modal) return;
+                const btn = openBtns[key];
+                const closeBtn = modal.querySelector('.close-button');
+                btn.onclick = () => { modal.style.display = "block"; if (key === 'heatmap') simulateHeatmap(); };
+                closeBtn.onclick = () => { modal.style.display = "none"; };
+            });
+            window.onclick = (event) => { if (Object.values(modals).includes(event.target)) { event.target.style.display = "none"; } };
+            
+            // --- New Gemini Features ---
+            document.getElementById('firstAidBtn').addEventListener('click', async () => {
+                const injury = document.getElementById('injuryDescription').value;
+                if (!injury) return;
+                const prompt = `Act as a first-aid guide. A person has the following injury: "${injury}". Provide immediate, simple, step-by-step first-aid instructions. Start with a clear warning in bold to call for professional medical help if the situation is serious. Use bullet points or a numbered list for the steps.`;
+                const resultEl = document.getElementById('firstAidResult');
+                resultEl.textContent = await callGeminiAPI({ contents: [{ parts: [{ text: prompt }] }] }, document.getElementById('firstAidLoader'), null);
+                resultEl.classList.remove('hidden');
+            });
+
+            document.getElementById('rumorBtn').addEventListener('click', async () => {
+                const rumor = document.getElementById('rumorText').value;
+                if (!rumor) return;
+                const prompt = `You are a fact-checker. A user has shared the following rumor: "${rumor}". Use Google Search to find information from official sources (like government agencies, NDMA, reputable news outlets) to verify or debunk this claim. Provide a clear summary of the findings and state whether the claim is likely true, false, or unverified.`;
+                const resultEl = document.getElementById('rumorResult');
+                resultEl.textContent = await callGeminiAPI({ contents: [{ parts: [{ text: prompt }] }], tools: [{ "google_search": {} }] }, document.getElementById('rumorLoader'), null);
+                resultEl.classList.remove('hidden');
+            });
+            
+            // --- Virtual Drill Experience ---
+            const drillContainer = document.getElementById('drill-experience-container');
+            const drillOverlay = document.getElementById('drill-overlay-content');
+            let currentDrillStep = 0;
+            let drillPerformance = [];
+            const synths = {};
+
+            async function initAudio() {
+                if (Tone.context.state !== 'running') await Tone.start();
+                synths.rumble = new Tone.NoiseSynth({ noise: { type: 'brown' }, envelope: { attack: 0.1, decay: 0.2, sustain: 0.5, release: 0.1 } }).toDestination();
+                synths.alarm = new Tone.Oscillator(880, "sine").toDestination();
+                synths.lfo = new Tone.LFO("8hz", 780, 980).connect(synths.alarm.frequency).start();
+                synths.success = new Tone.Synth().toDestination();
+                synths.failure = new Tone.Synth().toDestination();
+            }
+
+            const drillSteps = [
+                { type: 'intro', title: 'Virtual Earthquake Drill', text: 'You are in a classroom on the second floor. This simulation will test your response. Put on headphones for the best experience. Click Start when you are ready.', button: 'Start Drill' },
+                { type: 'action', duration: 5, text: 'The ground begins to shake violently!' },
+                { type: 'choice', title: 'What is your FIRST move?', choices: ['Run for the door', 'Drop, Cover, and Hold On', 'Scream for help'], correct: 1, feedback: 'Correct! Getting under a sturdy object protects you from falling debris.' },
+                { type: 'action', duration: 3, text: 'The shaking stops. A fire alarm begins to blare.' },
+                { type: 'choice', title: 'What now?', choices: ['Use the elevator to exit fast', 'Evacuate calmly via the stairs', 'Call your parents immediately'], correct: 1, feedback: 'Excellent. Calmly following evacuation routes is key to safety.' },
+                { type: 'summary', title: 'Drill Complete', text: 'You\'ve completed the simulation. Our AI is preparing your personalized performance debrief.' }
+            ];
+            function renderDrillStep() { const step = drillSteps[currentDrillStep]; drillOverlay.innerHTML = ''; if (step.type === 'intro') { drillOverlay.innerHTML = `<h2 class="text-4xl font-bold text-white mb-4">${step.title}</h2><p class="text-lg text-slate-300 mb-8 max-w-lg">${step.text}</p><button id="startDrillBtn" class="bg-orange-500 text-white font-bold text-lg py-3 px-8 rounded-lg">Start Drill</button>`; document.getElementById('startDrillBtn').addEventListener('click', async () => { await initAudio(); currentDrillStep++; renderDrillStep(); }); } else if (step.type === 'action') { drillOverlay.innerHTML = `<h2 class="text-3xl font-bold text-white animate-pulse">${step.text}</h2>`; if (step.text.includes('shake')) { drillContainer.classList.add('is-shaking'); synths.rumble.triggerAttack(); } if (step.text.includes('alarm')) { synths.alarm.start(); } setTimeout(() => { drillContainer.classList.remove('is-shaking'); synths.rumble.triggerRelease(); if (step.text.includes('alarm')) synths.alarm.stop(); currentDrillStep++; renderDrillStep(); }, step.duration * 1000); } else if (step.type === 'choice') { const choicesHTML = step.choices.map((choice, index) => `<button class="drill-choice-btn text-lg font-semibold w-full max-w-md p-4 rounded-lg" data-index="${index}">${choice}</button>`).join(''); drillOverlay.innerHTML = `<h2 class="text-3xl font-bold text-white mb-6">${step.title}</h2><div class="flex flex-col gap-4 w-full items-center">${choicesHTML}</div>`; drillOverlay.querySelectorAll('.drill-choice-btn').forEach(button => { button.addEventListener('click', (e) => { const selectedIndex = parseInt(e.target.dataset.index); drillPerformance.push({ question: step.title, answer: step.choices[selectedIndex], correct: selectedIndex === step.correct }); if (selectedIndex === step.correct) { synths.success.triggerAttackRelease("C5", "8n"); e.target.style.backgroundColor = 'var(--teal)'; } else { synths.failure.triggerAttackRelease("C#3", "8n"); e.target.style.backgroundColor = '#d32f2f'; } setTimeout(() => { currentDrillStep++; renderDrillStep(); }, 1500); }); }); } else if (step.type === 'summary') { drillOverlay.innerHTML = `<h2 class="text-4xl font-bold text-white mb-4">${step.title}</h2><p class="text-lg text-slate-300 mb-6">${step.text}</p><div id="debriefLoader" class="loader"></div><div id="debriefResult" class="gemini-response text-left hidden max-w-xl"></div><button id="restartDrillBtn" class="hidden mt-6 bg-orange-500 text-white font-bold py-3 px-8 rounded-lg">Practice Again</button>`; generateAIDebrief(); } }
+            async function generateAIDebrief() { const performanceSummary = drillPerformance.map(p => `For '${p.question}', they chose '${p.answer}' which was ${p.correct ? 'correct' : 'incorrect'}.`).join(' '); const prompt = `A user just did a virtual earthquake drill. Performance: ${performanceSummary}. Write a brief, encouraging debrief. Start with a positive comment, give two actionable tips based on their performance, and end with an empowering statement.`; const loader = document.getElementById('debriefLoader'); const resultEl = document.getElementById('debriefResult'); resultEl.textContent = await callGeminiAPI({ contents: [{ parts: [{ text: prompt }] }] }, loader, null); resultEl.classList.remove('hidden'); const restartBtn = document.getElementById('restartDrillBtn'); restartBtn.classList.remove('hidden'); restartBtn.addEventListener('click', () => { currentDrillStep = 0; drillPerformance = []; renderDrillStep(); }); }
+            renderDrillStep();
+
+            // All other JS (modals, gamified mission, etc.)
+            const chatHistory = document.getElementById('chat-history'); const chatInput = document.getElementById('chatInput'); const chatSendBtn = document.getElementById('chatSendBtn'); const chatLoader = document.getElementById('chatLoader');
+            async function handleChatSend() { const userText = chatInput.value.trim(); if (!userText) return; appendChatMessage(userText, 'user'); chatInput.value = ''; const language = document.getElementById('languageSelect').value; const prompt = `User asked in ${language}: "${userText}". First, translate this to English to understand the core question. Then, answer the question as a helpful disaster safety assistant. Finally, translate your helpful answer back into ${language}. Provide only the final translated answer.`; const responseText = await callGeminiAPI({ contents: [{ parts: [{ text: prompt }] }] }, chatLoader, null); appendChatMessage(responseText, 'bot'); }
+            chatSendBtn.addEventListener('click', handleChatSend); chatInput.addEventListener('keypress', (e) => { if(e.key === 'Enter') handleChatSend(); });
+            function appendChatMessage(text, sender) { const messageDiv = document.createElement('div'); messageDiv.className = `chat-message ${sender}`; const bubbleDiv = document.createElement('div'); bubbleDiv.className = `chat-bubble ${sender}`; bubbleDiv.textContent = text; messageDiv.appendChild(bubbleDiv); chatHistory.appendChild(messageDiv); chatHistory.scrollTop = chatHistory.scrollHeight; }
+            function simulateHeatmap() { const canvas = document.getElementById('heatmap-canvas'); const ctx = canvas.getContext('2d'); const people = []; const numPeople = 150; const safeZones = [{ x: 50, y: 50, radius: 30 }, { x: 500, y: 300, radius: 40 }]; const dangerZone = { x: canvas.width / 2, y: canvas.height / 2, radius: 80 }; for (let i = 0; i < numPeople; i++) { people.push({ x: Math.random() * canvas.width, y: Math.random() * canvas.height, speed: 0.5 + Math.random() * 0.5 }); } function animate() { ctx.clearRect(0, 0, canvas.width, canvas.height); ctx.fillStyle = 'rgba(255, 0, 0, 0.3)'; ctx.beginPath(); ctx.arc(dangerZone.x, dangerZone.y, dangerZone.radius, 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(0, 255, 0, 0.3)'; safeZones.forEach(zone => { ctx.beginPath(); ctx.arc(zone.x, zone.y, zone.radius, 0, Math.PI * 2); ctx.fill(); }); people.forEach(p => { let closestZone = safeZones[0]; let min_dist = Math.hypot(p.x - closestZone.x, p.y - closestZone.y); safeZones.forEach(zone => { const dist = Math.hypot(p.x - zone.x, p.y - zone.y); if (dist < min_dist) { min_dist = dist; closestZone = zone; } }); const angle = Math.atan2(closestZone.y - p.y, closestZone.x - p.x); p.x += Math.cos(angle) * p.speed; p.y += Math.sin(angle) * p.speed; ctx.fillStyle = `rgba(255, 255, 0, 0.7)`; ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill(); }); if (modals.heatmap.style.display === "block") { requestAnimationFrame(animate); } } animate(); }
+            const progressBar = document.getElementById('mission-progress-bar'); const missionSteps = { kitPacked: false, homeSecured: false, routeKnown: false }; const totalSteps = Object.keys(missionSteps).length; let completedSteps = 0;
+            function updateMissionProgress() { completedSteps = Object.values(missionSteps).filter(Boolean).length; const progress = (completedSteps / totalSteps) * 100; progressBar.style.width = `${progress}%`; if (completedSteps === totalSteps) { document.getElementById('mission-complete-msg').classList.remove('hidden'); } }
+            const draggables = document.querySelectorAll('.draggable-item'); const dropzone = document.getElementById('emergency-kit-dropzone'); let correctItemsInKit = 0; const requiredCorrectItems = 5;
+            draggables.forEach(draggable => { draggable.addEventListener('dragstart', () => { draggable.classList.add('dragging'); }); draggable.addEventListener('dragend', () => { draggable.classList.remove('dragging'); }); });
+            dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('drag-over'); }); dropzone.addEventListener('dragleave', () => { dropzone.classList.remove('drag-over'); });
+            dropzone.addEventListener('drop', e => { e.preventDefault(); const draggable = document.querySelector('.dragging'); dropzone.classList.remove('drag-over'); if (draggable) { if (draggable.dataset.item === 'correct') { dropzone.appendChild(draggable); draggable.setAttribute('draggable', 'false'); draggable.style.cursor = 'default'; draggable.style.backgroundColor = 'rgba(46, 125, 50, 0.5)'; correctItemsInKit++; if (correctItemsInKit >= requiredCorrectItems) { missionSteps.kitPacked = true; setTimeout(() => { document.getElementById('mission-step-2').classList.add('is-flipped'); missionSteps.homeSecured = true; updateMissionProgress(); }, 500); setTimeout(() => { document.getElementById('mission-step-3').classList.add('is-flipped'); missionSteps.routeKnown = true; updateMissionProgress(); }, 1000); } } else { draggable.style.backgroundColor = 'rgba(211, 47, 47, 0.5)'; setTimeout(() => { draggable.style.backgroundColor = '#1e293b'; }, 1000); } } updateMissionProgress(); });
+        });
+    </script>
+</body>
+</html>
+
